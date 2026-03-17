@@ -51,8 +51,8 @@ dependencies {
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.3.1")
 
-    // WebDAV 客户端
-    implementation("com.github.lookfirst:sardine-android:5.10")
+    // WebDAV：用 OkHttp 直接实现，不依赖第三方库
+    // implementation("com.github.lookfirst:sardine-android:5.10")
 
     // 网络
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

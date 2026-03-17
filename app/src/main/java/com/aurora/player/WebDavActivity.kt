@@ -1,20 +1,29 @@
 package com.aurora.player
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.thegrizzlylabs.sardineandroid.DavResource
-import com.thegrizzlylabs.sardineandroid.impl.OkHttpSardine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.net.Uri
-import android.content.Intent
+import okhttp3.Credentials
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import java.io.StringReader
+import java.util.concurrent.TimeUnit
 
 class WebDavActivity : AppCompatActivity() {
 
@@ -27,8 +36,16 @@ class WebDavActivity : AppCompatActivity() {
     private lateinit var btnBack: Button
     private lateinit var recyclerView: RecyclerView
 
-    private var sardine: OkHttpSardine? = null
     private var baseUrl: String = ""
+    private var credential: String = ""
+    private val pathStack = ArrayDeque<String>()
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    data class WebDavItem(val name: String, val href: String, val isDir: Boolean, val size: Long)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,11 +59,17 @@ class WebDavActivity : AppCompatActivity() {
         btnConnect = findViewById(R.id.btn_connect)
         btnBack = findViewById(R.id.btn_back)
         recyclerView = findViewById(R.id.recycler_view)
-
         recyclerView.layoutManager = LinearLayoutManager(this)
 
         btnConnect.setOnClickListener { connectWebDav() }
-        btnBack.setOnClickListener { finish() }
+        btnBack.setOnClickListener {
+            if (pathStack.isNotEmpty()) {
+                val prev = pathStack.removeLast()
+                browseDir(prev)
+            } else {
+                finish()
+            }
+        }
     }
 
     private fun connectWebDav() {
@@ -54,31 +77,31 @@ class WebDavActivity : AppCompatActivity() {
         val port = etPort.text.toString().trim().ifEmpty { "80" }
         val username = etUsername.text.toString().trim()
         val password = etPassword.text.toString().trim()
-        val path = etPath.text.toString().trim().ifEmpty { "/" }
+        val path = etPath.text.toString().trim().let { if (it.isEmpty()) "/" else it }
 
         if (host.isEmpty()) {
             Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show()
-            etHost.requestFocus()
             return
         }
 
-        baseUrl = "http://$host:$port"
-        val fullUrl = "$baseUrl$path"
+        val scheme = if (port == "443") "https" else "http"
+        baseUrl = "$scheme://$host:$port"
+        credential = if (username.isNotEmpty()) Credentials.basic(username, password) else ""
 
+        pathStack.clear()
+        browseDir(path)
+    }
+
+    private fun browseDir(path: String) {
         btnConnect.isEnabled = false
         btnConnect.text = getString(R.string.loading)
 
         lifecycleScope.launch {
             try {
-                val resources = withContext(Dispatchers.IO) {
-                    val s = OkHttpSardine()
-                    if (username.isNotEmpty()) s.setCredentials(username, password)
-                    sardine = s
-                    s.list(fullUrl)
-                }
+                val items = withContext(Dispatchers.IO) { propfind("$baseUrl$path") }
                 btnConnect.isEnabled = true
                 btnConnect.text = getString(R.string.connect)
-                showResources(resources, fullUrl)
+                showItems(items, path)
             } catch (e: Exception) {
                 btnConnect.isEnabled = true
                 btnConnect.text = getString(R.string.connect)
@@ -91,31 +114,108 @@ class WebDavActivity : AppCompatActivity() {
         }
     }
 
-    private fun showResources(resources: List<DavResource>, currentUrl: String) {
-        val items = resources.filter { !it.isDirectory || it.href.toString() != Uri.parse(currentUrl).path }
-        recyclerView.adapter = WebDavAdapter(items) { resource ->
-            if (resource.isDirectory) {
-                browseWebDavDir("$baseUrl${resource.href}")
-            } else {
-                val uri = Uri.parse("$baseUrl${resource.href}")
-                val intent = Intent(this, PlayerActivity::class.java).apply {
-                    putExtra(PlayerActivity.EXTRA_URI, uri.toString())
+    private fun propfind(url: String): List<WebDavItem> {
+        val body = """<?xml version="1.0" encoding="utf-8"?>
+<propfind xmlns="DAV:"><prop><displayname/><getcontentlength/><resourcetype/></prop></propfind>"""
+
+        val requestBody = okhttp3.RequestBody.create(
+            okhttp3.MediaType.parse("application/xml"), body
+        )
+        val reqBuilder = Request.Builder()
+            .url(url)
+            .method("PROPFIND", requestBody)
+            .header("Depth", "1")
+            .header("Content-Type", "application/xml")
+        if (credential.isNotEmpty()) reqBuilder.header("Authorization", credential)
+
+        val response = httpClient.newCall(reqBuilder.build()).execute()
+        if (!response.isSuccessful) throw Exception("HTTP ${response.code()}")
+        val xml = response.body()?.string() ?: throw Exception("空响应")
+        return parseWebDavXml(xml, url)
+    }
+
+    private fun parseWebDavXml(xml: String, currentUrl: String): List<WebDavItem> {
+        val items = mutableListOf<WebDavItem>()
+        val factory = XmlPullParserFactory.newInstance()
+        val parser = factory.newPullParser()
+        parser.setInput(StringReader(xml))
+
+        var href = ""; var displayName = ""; var size = 0L; var isDir = false
+        var inResponse = false; var tag = ""
+
+        var event = parser.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            when (event) {
+                XmlPullParser.START_TAG -> {
+                    tag = parser.name.lowercase()
+                    if (tag == "response") { href = ""; displayName = ""; size = 0L; isDir = false; inResponse = true }
+                    if (tag == "collection") isDir = true
                 }
-                startActivity(intent)
+                XmlPullParser.TEXT -> {
+                    if (!inResponse) { event = parser.next(); continue }
+                    when (tag) {
+                        "href" -> href = parser.text.trim()
+                        "displayname" -> displayName = parser.text.trim()
+                        "getcontentlength" -> size = parser.text.trim().toLongOrNull() ?: 0L
+                    }
+                }
+                XmlPullParser.END_TAG -> {
+                    if (parser.name.lowercase() == "response" && inResponse) {
+                        inResponse = false
+                        val name = displayName.ifEmpty { href.trimEnd('/').substringAfterLast('/') }
+                        // 跳过当前目录自身
+                        val currentPath = Uri.parse(currentUrl).path ?: ""
+                        if (href.trimEnd('/') != currentPath.trimEnd('/')) {
+                            items.add(WebDavItem(name, href, isDir, size))
+                        }
+                    }
+                }
+            }
+            event = parser.next()
+        }
+        return items.sortedWith(compareBy({ !it.isDir }, { it.name.lowercase() }))
+    }
+
+    private fun showItems(items: List<WebDavItem>, currentPath: String) {
+        recyclerView.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val view = LayoutInflater.from(parent.context).inflate(R.layout.item_file, parent, false)
+                return object : RecyclerView.ViewHolder(view) {}
+            }
+            override fun getItemCount() = items.size
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                val item = items[position]
+                val tvName = holder.itemView.findViewById<TextView>(R.id.tv_item_name)
+                val tvInfo = holder.itemView.findViewById<TextView>(R.id.tv_item_info)
+                val typeLabel = if (item.isDir) "文件夹" else "文件"
+                val sizeLabel = if (item.isDir) "" else "，${formatSize(item.size)}"
+                tvName.text = item.name
+                tvInfo.text = if (item.isDir) "文件夹" else formatSize(item.size)
+                holder.itemView.contentDescription = "$typeLabel：${item.name}$sizeLabel，双击打开"
+                holder.itemView.setOnClickListener {
+                    if (item.isDir) {
+                        pathStack.addLast(currentPath)
+                        browseDir(item.href)
+                    } else {
+                        val uri = Uri.parse("$baseUrl${item.href}")
+                        startActivity(Intent(this@WebDavActivity, PlayerActivity::class.java).apply {
+                            putExtra(PlayerActivity.EXTRA_URI, uri.toString())
+                        })
+                    }
+                }
             }
         }
     }
 
-    private fun browseWebDavDir(url: String) {
-        lifecycleScope.launch {
-            try {
-                val resources = withContext(Dispatchers.IO) {
-                    sardine?.list(url) ?: emptyList()
-                }
-                showResources(resources, url)
-            } catch (e: Exception) {
-                Toast.makeText(this@WebDavActivity, "加载失败：${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
+    private fun formatSize(bytes: Long): String = when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+        bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+        else -> "${bytes / (1024 * 1024 * 1024)} GB"
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        httpClient.dispatcher().executorService().shutdown()
     }
 }
