@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/surface_dark">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textSize="24sp"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:paddingBottom="16dp"
+        android:contentDescription="北极光播放器" />
+
+    <Button
+        android:id="@+id/btn_local_files"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="@string/local_files"
+        android:contentDescription="浏览本地音视频文件"
+        android:textSize="18sp"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/btn_webdav"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="@string/webdav_files"
+        android:contentDescription="连接 WebDAV 网络文件服务器"
+        android:textSize="18sp"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btn_back"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:text="@string/back"
+        android:contentDescription="返回上一级目录"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tv_current_path"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/on_surface"
+        android:textSize="13sp"
+        android:paddingBottom="8dp"
+        android:singleLine="true"
+        android:ellipsize="start" />
+
+    <TextView
+        android:id="@+id/tv_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="此目录没有媒体文件"
+        android:contentDescription="此目录没有媒体文件"
+        android:textColor="@color/on_surface"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

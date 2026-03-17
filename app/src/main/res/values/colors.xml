@@ -1,0 +1,9 @@
+<resources>
+    <color name="aurora_purple">#6200EE</color>
+    <color name="aurora_dark">#3700B3</color>
+    <color name="aurora_teal">#03DAC5</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="surface_dark">#1E1E2E</color>
+    <color name="on_surface">#E0E0E0</color>
+</resources>

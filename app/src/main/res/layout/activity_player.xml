@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/surface_dark">
+
+    <!-- 顶部标题栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:gravity="center_vertical">
+
+        <Button
+            android:id="@+id/btn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/back"
+            android:contentDescription="返回文件列表"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:singleLine="true"
+            android:ellipsize="middle"
+            android:paddingHorizontal="8dp" />
+    </LinearLayout>
+
+    <!-- 视频画面区域 -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/player_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/black" />
+
+    <!-- 进度条区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="8dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_current_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:minWidth="48dp" />
+
+        <SeekBar
+            android:id="@+id/seek_bar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:contentDescription="播放进度条，左右滑动调整进度"
+            android:paddingHorizontal="8dp" />
+
+        <TextView
+            android:id="@+id/tv_total_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:minWidth="48dp"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <!-- 主控制按钮区域（全部用 Button 带文字，无障碍友好） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="8dp">
+
+        <Button
+            android:id="@+id/btn_seek_back"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="@string/seek_backward"
+            android:contentDescription="快退10秒"
+            android:textSize="13sp"
+            android:layout_marginHorizontal="4dp" />
+
+        <Button
+            android:id="@+id/btn_previous"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="@string/previous"
+            android:contentDescription="上一个"
+            android:textSize="13sp"
+            android:layout_marginHorizontal="4dp" />
+
+        <Button
+            android:id="@+id/btn_play_pause"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1.5"
+            android:text="@string/play"
+            android:contentDescription="播放"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginHorizontal="4dp" />
+
+        <Button
+            android:id="@+id/btn_next"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="@string/next"
+            android:contentDescription="下一个"
+            android:textSize="13sp"
+            android:layout_marginHorizontal="4dp" />
+
+        <Button
+            android:id="@+id/btn_seek_forward"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="@string/seek_forward"
+            android:contentDescription="快进10秒"
+            android:textSize="13sp"
+            android:layout_marginHorizontal="4dp" />
+    </LinearLayout>
+
+    <!-- 次要控制按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingBottom="12dp"
+        android:paddingHorizontal="8dp">
+
+        <Button
+            android:id="@+id/btn_repeat"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="@string/repeat_off"
+            android:contentDescription="不循环，点击切换循环模式"
+            android:textSize="13sp"
+            android:layout_marginHorizontal="4dp" />
+
+        <Button
+            android:id="@+id/btn_shuffle"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="@string/shuffle_off"
+            android:contentDescription="随机播放关闭，点击开启"
+            android:textSize="13sp"
+            android:layout_marginHorizontal="4dp" />
+    </LinearLayout>
+
+</LinearLayout>
