@@ -37,6 +37,7 @@ class WebDavActivity : AppCompatActivity() {
     private lateinit var btnConnect: Button
     private lateinit var btnBack: Button
     private lateinit var recyclerView: RecyclerView
+    private lateinit var tvStatus: TextView  // 状态显示
 
     private var baseUrl: String = ""
     private var credential: String = ""
@@ -61,6 +62,7 @@ class WebDavActivity : AppCompatActivity() {
         btnConnect = findViewById(R.id.btn_connect)
         btnBack = findViewById(R.id.btn_back)
         recyclerView = findViewById(R.id.recycler_view)
+        tvStatus = findViewById(R.id.tv_status)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
         btnConnect.setOnClickListener { connectWebDav() }
@@ -71,6 +73,14 @@ class WebDavActivity : AppCompatActivity() {
             } else {
                 finish()
             }
+        }
+    }
+
+    private fun setStatus(msg: String) {
+        runOnUiThread {
+            tvStatus.text = msg
+            tvStatus.contentDescription = msg
+            tvStatus.visibility = View.VISIBLE
         }
     }
 
@@ -90,6 +100,7 @@ class WebDavActivity : AppCompatActivity() {
         baseUrl = "$scheme://$host:$port"
         credential = if (username.isNotEmpty()) Credentials.basic(username, password) else ""
 
+        setStatus("正在连接 $baseUrl$path ...")
         pathStack.clear()
         browseDir(path)
     }
@@ -97,21 +108,27 @@ class WebDavActivity : AppCompatActivity() {
     private fun browseDir(path: String) {
         btnConnect.isEnabled = false
         btnConnect.text = getString(R.string.loading)
+        setStatus("正在加载 $path ...")
 
         lifecycleScope.launch {
             try {
-                val items = withContext(Dispatchers.IO) { propfind("$baseUrl$path") }
+                val fullUrl = "$baseUrl$path"
+                setStatus("发送 PROPFIND 请求到 $fullUrl")
+                val items = withContext(Dispatchers.IO) { propfind(fullUrl) }
                 btnConnect.isEnabled = true
                 btnConnect.text = getString(R.string.connect)
+                if (items.isEmpty()) {
+                    setStatus("连接成功，目录为空")
+                } else {
+                    setStatus("连接成功，共 ${items.size} 个文件/文件夹")
+                }
                 showItems(items, path)
             } catch (e: Exception) {
                 btnConnect.isEnabled = true
                 btnConnect.text = getString(R.string.connect)
-                Toast.makeText(
-                    this@WebDavActivity,
-                    "${getString(R.string.error_webdav_failed)}：${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                val errMsg = "连接失败：${e.javaClass.simpleName}: ${e.message}"
+                setStatus(errMsg)
+                Toast.makeText(this@WebDavActivity, errMsg, Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -129,14 +146,21 @@ class WebDavActivity : AppCompatActivity() {
         if (credential.isNotEmpty()) reqBuilder.header("Authorization", credential)
 
         val response = httpClient.newCall(reqBuilder.build()).execute()
-        if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-        val xml = response.body?.string() ?: throw Exception("空响应")
-        return parseWebDavXml(xml, url)
+        val code = response.code
+        val bodyStr = response.body?.string() ?: ""
+
+        if (!response.isSuccessful) {
+            throw Exception("HTTP $code - ${response.message} | 响应体: ${bodyStr.take(200)}")
+        }
+        if (bodyStr.isEmpty()) throw Exception("服务器返回空响应 (HTTP $code)")
+
+        return parseWebDavXml(bodyStr, url)
     }
 
     private fun parseWebDavXml(xml: String, currentUrl: String): List<WebDavItem> {
         val items = mutableListOf<WebDavItem>()
         val factory = XmlPullParserFactory.newInstance()
+        factory.isNamespaceAware = true
         val parser = factory.newPullParser()
         parser.setInput(StringReader(xml))
 
@@ -148,7 +172,9 @@ class WebDavActivity : AppCompatActivity() {
             when (event) {
                 XmlPullParser.START_TAG -> {
                     tag = parser.name.lowercase()
-                    if (tag == "response") { href = ""; displayName = ""; size = 0L; isDir = false; inResponse = true }
+                    if (tag == "response") {
+                        href = ""; displayName = ""; size = 0L; isDir = false; inResponse = true
+                    }
                     if (tag == "collection") isDir = true
                 }
                 XmlPullParser.TEXT -> {
@@ -162,8 +188,9 @@ class WebDavActivity : AppCompatActivity() {
                 XmlPullParser.END_TAG -> {
                     if (parser.name.lowercase() == "response" && inResponse) {
                         inResponse = false
-                        val name = displayName.ifEmpty { href.trimEnd('/').substringAfterLast('/') }
-                        // 跳过当前目录自身
+                        val name = displayName.ifEmpty {
+                            href.trimEnd('/').substringAfterLast('/').ifEmpty { "/" }
+                        }
                         val currentPath = Uri.parse(currentUrl).path ?: ""
                         if (href.trimEnd('/') != currentPath.trimEnd('/')) {
                             items.add(WebDavItem(name, href, isDir, size))
@@ -179,7 +206,8 @@ class WebDavActivity : AppCompatActivity() {
     private fun showItems(items: List<WebDavItem>, currentPath: String) {
         recyclerView.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-                val view = LayoutInflater.from(parent.context).inflate(R.layout.item_file, parent, false)
+                val view = LayoutInflater.from(parent.context)
+                    .inflate(R.layout.item_file, parent, false)
                 return object : RecyclerView.ViewHolder(view) {}
             }
             override fun getItemCount() = items.size
@@ -198,9 +226,11 @@ class WebDavActivity : AppCompatActivity() {
                         browseDir(item.href)
                     } else {
                         val uri = Uri.parse("$baseUrl${item.href}")
-                        startActivity(Intent(this@WebDavActivity, PlayerActivity::class.java).apply {
-                            putExtra(PlayerActivity.EXTRA_URI, uri.toString())
-                        })
+                        startActivity(
+                            Intent(this@WebDavActivity, PlayerActivity::class.java).apply {
+                                putExtra(PlayerActivity.EXTRA_URI, uri.toString())
+                            }
+                        )
                     }
                 }
             }

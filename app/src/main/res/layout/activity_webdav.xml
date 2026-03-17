@@ -115,7 +115,18 @@
         android:text="@string/connect"
         android:contentDescription="连接到 WebDAV 服务器"
         android:textSize="18sp"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="8dp" />
+
+    <!-- 状态信息：显示每一步的进度和错误详情 -->
+    <TextView
+        android:id="@+id/tv_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#FFCC00"
+        android:textSize="13sp"
+        android:padding="8dp"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
