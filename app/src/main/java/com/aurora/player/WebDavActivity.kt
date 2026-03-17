@@ -18,8 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Credentials
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
@@ -118,9 +120,7 @@ class WebDavActivity : AppCompatActivity() {
         val body = """<?xml version="1.0" encoding="utf-8"?>
 <propfind xmlns="DAV:"><prop><displayname/><getcontentlength/><resourcetype/></prop></propfind>"""
 
-        val requestBody = okhttp3.RequestBody.create(
-            okhttp3.MediaType.parse("application/xml"), body
-        )
+        val requestBody = body.toRequestBody("application/xml".toMediaType())
         val reqBuilder = Request.Builder()
             .url(url)
             .method("PROPFIND", requestBody)
@@ -129,8 +129,8 @@ class WebDavActivity : AppCompatActivity() {
         if (credential.isNotEmpty()) reqBuilder.header("Authorization", credential)
 
         val response = httpClient.newCall(reqBuilder.build()).execute()
-        if (!response.isSuccessful) throw Exception("HTTP ${response.code()}")
-        val xml = response.body()?.string() ?: throw Exception("空响应")
+        if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+        val xml = response.body?.string() ?: throw Exception("空响应")
         return parseWebDavXml(xml, url)
     }
 
@@ -216,6 +216,6 @@ class WebDavActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        httpClient.dispatcher().executorService().shutdown()
+        httpClient.dispatcher.executorService.shutdown()
     }
 }
